@@ -20,7 +20,7 @@ from CTFd.utils.logging import log
 from CTFd.utils.security.auth import login_user, logout_user
 from CTFd.utils.decorators.visibility import check_registration_visibility
 
-from CTFd.plugins.simple_oauth2.services.google import GoogleOAuth
+from .services.google import GoogleOAuth
 
 oauth = Blueprint("simple-oauth2", __name__)#, template_folder="templates")
 
