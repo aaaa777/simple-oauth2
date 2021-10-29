@@ -22,7 +22,7 @@ from CTFd.utils.decorators.visibility import check_registration_visibility
 
 from .services.google import GoogleOAuth
 
-oauth = Blueprint("simple-oauth2", __name__)#, template_folder="templates")
+oauth = Blueprint("simple-oauth2", __name__)
 
 plugin_dir = os.path.dirname(os.path.realpath(__file__))
 templates_dir = os.path.join(plugin_dir, "templates")
@@ -36,16 +36,19 @@ templates_dir = os.path.join(plugin_dir, "templates")
 @oauth.route(GoogleOAuth.endpoint_path)
 def oauth_login():
 
+    # gets row response including token from google oauth
+    # "code" and "scope" querys are given via request
     response = GoogleOAuth.request_token()
 
+    # when something went wrong
     if response.status_code != 200:
         error_for(
             endpoint="auth.login", message="Sorry, Google OAuth login currentry unavailable."
         )
         return redirect(url_for("auth.login"))
 
+    # request infomation with access_token
     res_dict = dict(response.json())
-
     response = GoogleOAuth.request_email(token=res_dict["access_token"])
 
     if response.status_code != 200:
@@ -54,39 +57,40 @@ def oauth_login():
         )
         return redirect(url_for("auth.login"))
     
+    # response
     userdata = dict(response.json())
 
-
     email_address = userdata["email"]
-    user_id = email_address.split("@")[0]
+    user_id = userdata["id"]
     valid_email = validators.validate_email(email_address)
 
-    # if email exidts in table
-    #if not valid_email:
-    #    errors.append()
+    if email.check_email_is_whitelisted(email_address) is False:
+        error_for(
+            endpoint="auth.login", message="Sorry, Your mail address is restricted."
+        )
+        return redirect(url_for("auth.login"))
 
+    # search for email from user table
     emails = (
         Users.query.add_columns("email", "id")
             .filter_by(email=email_address)
             .first()
     )
 
-    next_url = ""
-    if email.check_email_is_whitelisted(email_address) is False:
-        error_for(
-            endpoint="auth.login", message="s.do-johodai.ac.jpのメールアドレスでログインしてください"
-        )
-        return redirect(url_for("auth.login"))
-
     if not emails:
+        
+        # create new user when not exists
         user = Users(
             name=user_id,
             email=email_address,
             verified=True
         )
+
         db.session.add(user)
         db.session.commit()
         db.session.flush()
+
+        db.session.close()
 
         log("registrations",
             format="[{date}] {ip} - {name} registered with {email}",
@@ -94,11 +98,13 @@ def oauth_login():
             email=user.email
         )
 
-        db.session.close()
+        # set welcome messages
         info_for(
             endpoint="challenges.listing", message="Change your nickname from Settings, Good luck!"
         )
     else:
+
+        # user exists
         user = Users.query.filter_by(email=email_address).first()
     
     login_user(user)
@@ -115,42 +121,27 @@ def g_oauth_url():
 def g_login_error():
     return "none"
 
-
-#@oauth.route("/register")
-#@check_registration_visibility
-##@ratelimit(method="POST", limit=10, interval=5)
-#def oauth_register():
-#    if current_user.authed():
-#        return redirect(url_for("challenges.listing"))
-#    
-#    oauth_url = GoogleOAuth.auth_url()
-#    
-#    return redirect(oauth_url)
-
-#auth.register = oauth_register
-   
-
-#class OAuthUser(db.Model):
     
-#    id = db.Column(db.Integer)
-    
-
+# the method to overwrite route of /register
 def alt_register():
+
+    # render from template from plugin
     register_template = os.path.join(templates_dir, "register.html")
     return render_template_string(
         open(register_template).read(),
-        #infos=["not allowed"],
         oauth_link=GoogleOAuth.auth_url()
     )
 
+# the method to overwrite route of /login
 login_template = os.path.join(templates_dir, "login.html")
 def alt_login():
 
+    # when user already logged in
     errors = get_errors()
     if current_user.authed():
         return redirect(url_for("challenges.listing"))
 
-    errors = get_errors()
+    # login attempt
     if request.method == "POST":
         name = request.form["name"]
 
@@ -166,6 +157,8 @@ def alt_login():
                     "Your account was registered with a 3rd party authentication provider. "
                     "Please try logging in with a configured authentication provider."
                 )
+
+                # render_template from /simple-oauth2/assets/login.html
                 return render_template_string(
                     open(login_template).read(), 
                     errors=errors
@@ -193,6 +186,8 @@ def alt_login():
                 )
                 errors.append("Your username or password is incorrect")
                 db.session.close()
+
+                # render_template from /simple-oauth2/assets/login.html
                 return render_template_string(
                     open(login_template).read(),
                     errors=errors
@@ -202,14 +197,16 @@ def alt_login():
             log("logins", "[{date}] {ip} - submitted invalid account information")
             errors.append("Your username or password is incorrect")
             db.session.close()
+            
+            # render_template from /simple-oauth2/assets/login.html
             return render_template_string(
                 open(login_template).read(),
                 errors=errors
             )
     else:
         db.session.close()
-        #return render_template("login.html", errors=errors)
 
+        # render_template from /simple-oauth2/assets/login.html
         return render_template_string(
             open(login_template).read(),
             oauth_link=GoogleOAuth.auth_url(),
@@ -219,11 +216,17 @@ def alt_login():
 
 
 def load(app):
-    register_plugin_assets_directory(app, base_path=os.path.join(plugin_dir, "assets"))
+
+    # set assets dir to /simple-oauth2/assets
+    register_plugin_assets_directory(
+        app,
+        base_path="plugins/simple-oauth2/assets"
+    )
     #app.register_blueprint(auth, **{"url_defaults": {"/register": None}})
+
+    # overwrite routes
     app.view_functions['auth.register'] = alt_register
     app.view_functions['auth.login'] = alt_login
-    #def alt_error():
-    #    return str(vars(app.config))
+    
+    # confirm blueprint
     app.register_blueprint(oauth)
-    #app.view_functions["simple-oauth2.g_login_error"] = alt_error
