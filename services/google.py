@@ -61,12 +61,20 @@ class GoogleOAuth(BaseOAuth):
     @classmethod
     def request_token(cls):
         headers = {"Content-type": "application/x-www-form-urlencoded"}
-        payload = dict(filter(lambda query: (query[0] in ["code", "scope"]), request.args.items()))
+        payload = dict(
+            filter(
+                # reuse "code" and "scope" query
+                lambda query: (query[0] in ["code", "scope"]),
+                request.args.items()
+            )
+        )
         payload["client_id"] = cls.client_id
         payload["client_secret"] = cls.client_secret
         # https://tedboy.github.io/flask/generated/generated/flask.Request.html
         # requestが無いところで呼ばれた時どうしよう～
-        payload["redirect_uri"] = request.base_url
+        
+        payload["redirect_uri"] = request.base_url# \
+        #    or 
         #payload["redirect_uri"] = (request and request.base_url) \
         #                       or "http://localhost/o/g/redirect"
         payload["grant_type"] = "authorization_code"
