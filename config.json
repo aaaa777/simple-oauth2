@@ -1,3 +1,4 @@
 {
-  "name": "Simple OAuth2.0 plugin"
+  "name": "Simple OAuth2.0 plugin",
+  "route": "/simple-oauth2/config"
 }
