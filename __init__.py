@@ -40,7 +40,7 @@ def oauth_login():
 
     if response.status_code != 200:
         error_for(
-            endpoint="auth.login", message="OAuth認証エラー"
+            endpoint="auth.login", message="Sorry, Google OAuth login currentry unavailable."
         )
         return redirect(url_for("auth.login"))
 
@@ -50,7 +50,7 @@ def oauth_login():
 
     if response.status_code != 200:
         error_for(
-            endpoint="auth.login", message="トークン認証エラー"
+            endpoint="auth.login", message="Sorry, Google OAuth login currentry unavailable."
         )
         return redirect(url_for("auth.login"))
     
@@ -96,9 +96,8 @@ def oauth_login():
 
         db.session.close()
         info_for(
-            endpoint="challenges.listing", message="Settingsよりユーザー名を変更できます、Good luck!"
+            endpoint="challenges.listing", message="Change your nickname from Settings, Good luck!"
         )
-        #next_url = url_for("views.settings"))
     else:
         user = Users.query.filter_by(email=email_address).first()
     
